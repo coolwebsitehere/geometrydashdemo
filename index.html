@@ -8,12 +8,12 @@
     body {
       margin: 0;
       overflow: hidden;
-      background-color: white;
     }
     canvas {
       display: block;
       margin: 0 auto;
-      background: #ffffff;
+      background: white;
+      transition: background 0.4s ease;
     }
   </style>
 </head>
@@ -23,12 +23,25 @@
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
-    // Game constants
+    // Color themes: background, player, and obstacle
+    const themes = [
+      { bg: "#ffffff", player: "#000000", obstacle: "#ff0000" },
+      { bg: "#cce7ff", player: "#003344", obstacle: "#cc4400" },
+      { bg: "#ffe6cc", player: "#663300", obstacle: "#004466" },
+      { bg: "#e0ffcc", player: "#334400", obstacle: "#660033" },
+      { bg: "#ffd6d6", player: "#990000", obstacle: "#000066" },
+      { bg: "#f0e6ff", player: "#3a0066", obstacle: "#00663a" },
+    ];
+
+    let currentThemeIndex = 0;
+    let playerColor = "#000000";
+    let obstacleColor = "#ff0000";
+
+    // Game state variables
+    let player, obstacles, scrollSpeed, score, highScore, gameOver, lastThemeChange;
+
     const obstacleSpacing = 200;
     const baseSpeed = 5;
-
-    // Game state
-    let player, obstacles, scrollSpeed, score, gameOver, highScore;
 
     function initGame() {
       player = {
@@ -46,14 +59,26 @@
       scrollSpeed = baseSpeed;
       score = 0;
       gameOver = false;
+      lastThemeChange = 0;
 
-      // Load high score from localStorage
+      // Load high score
       highScore = parseInt(localStorage.getItem("highScore")) || 0;
 
-      // Create initial obstacles
+      // Set initial theme
+      currentThemeIndex = 0;
+      applyTheme(currentThemeIndex);
+
+      // Spawn initial obstacles
       for (let i = 600; i <= 1000; i += obstacleSpacing) {
         obstacles.push(createObstacle(i));
       }
+    }
+
+    function applyTheme(index) {
+      const theme = themes[index];
+      canvas.style.background = theme.bg;
+      playerColor = theme.player;
+      obstacleColor = theme.obstacle;
     }
 
     function createObstacle(x) {
@@ -65,22 +90,10 @@
       };
     }
 
-    window.addEventListener("keydown", (e) => {
-      if (e.code === "Space") {
-        if (!gameOver && player.onGround) {
-          player.velocityY = player.jumpForce;
-          player.onGround = false;
-        } else if (gameOver) {
-          initGame(); // Retry
-        }
-      }
-    });
-
     function update() {
       if (gameOver) return;
 
-      // Gradually increase scroll speed
-      scrollSpeed += 0.005;
+      scrollSpeed += 0.005; // Speed up gradually
 
       // Apply gravity
       player.velocityY += player.gravity;
@@ -93,10 +106,11 @@
         player.onGround = true;
       }
 
-      // Move obstacles and check collisions
+      // Move and check obstacles
       for (let obs of obstacles) {
         obs.x -= scrollSpeed;
 
+        // Collision detection
         if (
           player.x < obs.x + obs.width &&
           player.x + player.width > obs.x &&
@@ -104,8 +118,6 @@
           player.y + player.height > obs.y
         ) {
           gameOver = true;
-
-          // Save high score if beaten
           if (score > highScore) {
             highScore = score;
             localStorage.setItem("highScore", highScore);
@@ -113,7 +125,7 @@
         }
       }
 
-      // Remove off-screen obstacles and add new ones
+      // Remove passed obstacles and add new ones
       if (obstacles.length > 0 && obstacles[0].x + obstacles[0].width < 0) {
         obstacles.shift();
         const lastX = obstacles[obstacles.length - 1].x;
@@ -122,34 +134,41 @@
 
       // Increase score
       score++;
+
+      // Change theme every 100 score
+      if (score - lastThemeChange >= 100) {
+        lastThemeChange = score;
+        currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+        applyTheme(currentThemeIndex);
+      }
     }
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw player
-      ctx.fillStyle = "#000000";
+      // Player
+      ctx.fillStyle = playerColor;
       ctx.fillRect(player.x, player.y, player.width, player.height);
 
-      // Draw obstacles
-      ctx.fillStyle = "#ff0000";
+      // Obstacles
+      ctx.fillStyle = obstacleColor;
       for (let obs of obstacles) {
         ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
       }
 
-      // Draw score and high score
+      // Score and high score
       ctx.fillStyle = "#000000";
       ctx.font = "20px Arial";
       ctx.fillText("Score: " + score, 10, 30);
       ctx.fillText("High Score: " + highScore, 10, 60);
 
-      // Game Over text
+      // Game over text
       if (gameOver) {
         ctx.fillStyle = "black";
         ctx.font = "36px Arial";
         ctx.fillText("Game Over", canvas.width / 2 - 90, canvas.height / 2 - 10);
         ctx.font = "20px Arial";
-        ctx.fillText("Press SPACE to retry", canvas.width / 2 - 100, canvas.height / 2 + 30);
+        ctx.fillText("Press SPACE or Click to retry", canvas.width / 2 - 140, canvas.height / 2 + 30);
       }
     }
 
@@ -158,6 +177,25 @@
       draw();
       requestAnimationFrame(loop);
     }
+
+    function tryJump() {
+      if (!gameOver && player.onGround) {
+        player.velocityY = player.jumpForce;
+        player.onGround = false;
+      } else if (gameOver) {
+        initGame();
+      }
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        tryJump();
+      }
+    });
+
+    window.addEventListener("mousedown", () => {
+      tryJump();
+    });
 
     // Start the game
     initGame();
