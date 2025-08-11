@@ -1,16 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dart Shooter</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Geometry Dash Demo</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: white;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+  </style>
 </head>
 <body>
-    <h1>Dart Shooter 🎯</h1>
-    <p id="score">Score: 0</p>
-    <canvas id="gameCanvas" width="400" height="600"></canvas>
-    <p id="gameOverText"></p>
-    <script src="script.js"></script>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Game constants
+    const obstacleSpacing = 200;
+    const baseSpeed = 5;
+
+    // Game state
+    let player, obstacles, scrollSpeed, score, gameOver, highScore;
+
+    function initGame() {
+      player = {
+        x: 100,
+        y: 0,
+        width: 40,
+        height: 40,
+        velocityY: 0,
+        gravity: 1,
+        jumpForce: -15,
+        onGround: false
+      };
+
+      obstacles = [];
+      scrollSpeed = baseSpeed;
+      score = 0;
+      gameOver = false;
+
+      // Load high score from localStorage
+      highScore = parseInt(localStorage.getItem("highScore")) || 0;
+
+      // Create initial obstacles
+      for (let i = 600; i <= 1000; i += obstacleSpacing) {
+        obstacles.push(createObstacle(i));
+      }
+    }
+
+    function createObstacle(x) {
+      return {
+        x,
+        y: canvas.height - 40,
+        width: 40,
+        height: 40
+      };
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        if (!gameOver && player.onGround) {
+          player.velocityY = player.jumpForce;
+          player.onGround = false;
+        } else if (gameOver) {
+          initGame(); // Retry
+        }
+      }
+    });
+
+    function update() {
+      if (gameOver) return;
+
+      // Gradually increase scroll speed
+      scrollSpeed += 0.001;
+
+      // Apply gravity
+      player.velocityY += player.gravity;
+      player.y += player.velocityY;
+
+      // Ground collision
+      if (player.y + player.height >= canvas.height) {
+        player.y = canvas.height - player.height;
+        player.velocityY = 0;
+        player.onGround = true;
+      }
+
+      // Move obstacles and check collisions
+      for (let obs of obstacles) {
+        obs.x -= scrollSpeed;
+
+        if (
+          player.x < obs.x + obs.width &&
+          player.x + player.width > obs.x &&
+          player.y < obs.y + obs.height &&
+          player.y + player.height > obs.y
+        ) {
+          gameOver = true;
+
+          // Save high score if beaten
+          if (score > highScore) {
+            highScore = score;
+            localStorage.setItem("highScore", highScore);
+          }
+        }
+      }
+
+      // Remove off-screen obstacles and add new ones
+      if (obstacles.length > 0 && obstacles[0].x + obstacles[0].width < 0) {
+        obstacles.shift();
+        const lastX = obstacles[obstacles.length - 1].x;
+        obstacles.push(createObstacle(lastX + obstacleSpacing));
+      }
+
+      // Increase score
+      score++;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw player
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+
+      // Draw obstacles
+      ctx.fillStyle = "#ff0000";
+      for (let obs of obstacles) {
+        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+      }
+
+      // Draw score and high score
+      ctx.fillStyle = "#000000";
+      ctx.font = "20px Arial";
+      ctx.fillText("Score: " + score, 10, 30);
+      ctx.fillText("High Score: " + highScore, 10, 60);
+
+      // Game Over text
+      if (gameOver) {
+        ctx.fillStyle = "black";
+        ctx.font = "36px Arial";
+        ctx.fillText("Game Over", canvas.width / 2 - 90, canvas.height / 2 - 10);
+        ctx.font = "20px Arial";
+        ctx.fillText("Press SPACE to retry", canvas.width / 2 - 100, canvas.height / 2 + 30);
+      }
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // Start the game
+    initGame();
+    loop();
+  </script>
 </body>
 </html>
